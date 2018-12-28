@@ -8,17 +8,17 @@ use std::collections::{HashSet, HashMap};
 use regex::Regex;
 use chrono::prelude::*;
 
-fn one_a(data: &Vec<i32>) -> String {
+fn one_a(data: &Vec<i32>) -> i32 {
     let mut total = 0;
 
     for item in data {
         total += item;
     }
 
-    return format!("{}", total);
+    total
 }
 
-fn one_b(data: &Vec<i32>) -> String {
+fn one_b(data: &Vec<i32>) -> i32 {
     let mut map = HashSet::new();
     let mut total = 0;
 
@@ -27,7 +27,7 @@ fn one_b(data: &Vec<i32>) -> String {
             total += item;
 
             if map.contains(&total) {
-                return format!("{}", total);
+                return total;
             }
 
             map.insert(total);
@@ -91,7 +91,7 @@ struct Claim {
     height: i32,
 }
 
-fn three_a(data: &Vec<Claim>) -> String {
+fn three_a(data: &Vec<Claim>) -> i32 {
     let mut fabric = HashMap::new();
 
     for claim in data {
@@ -110,10 +110,10 @@ fn three_a(data: &Vec<Claim>) -> String {
         }
     }
 
-    format!("{}", doubles)
+    doubles
 }
 
-fn three_b(data: &Vec<Claim>) -> String {
+fn three_b(data: &Vec<Claim>) -> i32 {
     let mut fabric = HashMap::new();
 
     let mut pristine_claims = HashSet::new();
@@ -135,11 +135,7 @@ fn three_b(data: &Vec<Claim>) -> String {
         }
     }
 
-    for claim in pristine_claims.iter() {
-        return format!("{}", claim);
-    }
-
-    "0".to_string()
+    return *pristine_claims.iter().next().unwrap_or(&0);
 }
 
 enum ShiftAction {
@@ -180,7 +176,7 @@ fn get_sleepiest_minute(sleep_list: &Vec<(NaiveDateTime, NaiveDateTime)>) -> (Na
     (sleepiest_minute, max_times_slept)
 }
 
-fn four_a(data: &HashMap<u32, Vec<(NaiveDateTime, NaiveDateTime)>>) -> String {
+fn four_a(data: &HashMap<u32, Vec<(NaiveDateTime, NaiveDateTime)>>) -> u32 {
     let mut minutes_slept: HashMap<u32, i64> = HashMap::new();
 
     for (guard, sleeps) in data {
@@ -201,10 +197,12 @@ fn four_a(data: &HashMap<u32, Vec<(NaiveDateTime, NaiveDateTime)>>) -> String {
 
     let (sleepiest_minute, _) = get_sleepiest_minute(data.get(&sleepiest_guard).unwrap());
     format!("{} x {} = {}", sleepiest_guard, sleepiest_minute.minute(),
-             sleepiest_guard * sleepiest_minute.minute())
+             sleepiest_guard * sleepiest_minute.minute());
+
+    sleepiest_guard * sleepiest_minute.minute()
 }
 
-fn four_b(data: &HashMap<u32, Vec<(NaiveDateTime, NaiveDateTime)>>) -> String {
+fn four_b(data: &HashMap<u32, Vec<(NaiveDateTime, NaiveDateTime)>>) -> u32 {
     let mut sleepiest_guard = 0;
     let mut max_sleepiest_minute = 0;
     let mut max_times_slept = 0;
@@ -218,7 +216,9 @@ fn four_b(data: &HashMap<u32, Vec<(NaiveDateTime, NaiveDateTime)>>) -> String {
         }
     }
     format!("{} x {} = {}", sleepiest_guard, max_sleepiest_minute,
-             sleepiest_guard * max_sleepiest_minute)
+             sleepiest_guard * max_sleepiest_minute);
+
+    sleepiest_guard * max_sleepiest_minute
 }
 
 fn react_polymer_once(p: &mut Vec<u8>) {
@@ -249,12 +249,12 @@ fn fully_react_polymer(p: &mut Vec<u8>) {
     }
 }
 
-fn five_a(data: &String) -> String {
+fn five_a(data: &String) -> usize {
     let mut polymer = data.clone().into_bytes();
 
     fully_react_polymer(&mut polymer);
 
-    format!("{}", polymer.len())
+    polymer.len()
 }
 
 fn polymer_copy_without_char(p: &Vec<u8>, c: u8) -> Vec<u8>{
@@ -267,7 +267,7 @@ fn polymer_copy_without_char(p: &Vec<u8>, c: u8) -> Vec<u8>{
     new
 }
 
-fn five_b(data: &String) -> String {
+fn five_b(data: &String) -> usize {
     let polymer = data.clone().into_bytes();
 
     let mut removed: HashSet<u8> = HashSet::new();
@@ -276,19 +276,18 @@ fn five_b(data: &String) -> String {
 
     for c in polymer.iter() {
         if char::from(*c).is_lowercase() && !removed.contains(c) {
+            removed.insert(*c);
+
             let mut new_polymer = polymer_copy_without_char(&polymer, *c);
             fully_react_polymer(&mut new_polymer);
-            if new_polymer.len() < shortest {
-                shortest = new_polymer.len();
-            }
-            removed.insert(*c);
+            shortest = std::cmp::min(new_polymer.len(), shortest);
         }
     }
 
-    format!("{}", shortest)
+    shortest
 }
 
-fn six_a(data: &Vec<(i32, i32)>) -> String {
+fn six_a(data: &Vec<(i32, i32)>) -> u32 {
     // coordinates at the outside edge of the grid have infinite space and don't count
     let (mut x_min, mut x_max, mut y_min, mut y_max) = (data[0].0, 0, data[0].1, 0);
 
@@ -332,10 +331,10 @@ fn six_a(data: &Vec<(i32, i32)>) -> String {
             max_count = std::cmp::max(count, max_count);
         }
     }
-    format!("{}", max_count)
+    max_count
 }
 
-fn six_b(data: &Vec<(i32, i32)>) -> String {
+fn six_b(data: &Vec<(i32, i32)>) -> u32 {
     let (mut x_min, mut x_max, mut y_min, mut y_max) = (data[0].0, 0, data[0].1, 0);
 
     for (x, y) in data {
@@ -365,17 +364,22 @@ fn six_b(data: &Vec<(i32, i32)>) -> String {
         }
     }
 
-    format!("{}", in_distance)
+    in_distance
 }
 
-struct Puzzle<T> {
+fn seven_a(data: &HashMap<char, Vec<char>>) -> String {
+    String::new()
+}
+
+struct Puzzle<T, R> {
     // T is the type that the input gets parsed into
+    // R is the type that the answer comes in
     name: &'static str,
     preprocess: fn(Vec<String>) -> T,
-    parts: Vec<fn(&T) -> String>,
+    parts: Vec<fn(&T) -> R>,
 }
 
-fn solve_puzzle<T>(p: Puzzle<T>) {
+fn solve_puzzle<T, R>(p: Puzzle<T, R>) where R: std::fmt::Display {
     let debug = false;
     let dir = "inputs";
 
