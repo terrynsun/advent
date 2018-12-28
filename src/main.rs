@@ -368,15 +368,171 @@ fn six_b(data: &Vec<(i32, i32)>) -> u32 {
 }
 
 fn seven_a(data: &HashMap<char, Vec<char>>) -> String {
-    String::new()
+    let mut done = String::new();
+    let steps = data.keys().len();
+
+    while done.len() != steps {
+        let mut doable = Vec::new();
+        for (step, reqs) in data {
+            if done.contains(*step) {
+                continue;
+            }
+
+            let mut possible = true;
+            for req in reqs {
+                if !done.contains(*req) {
+                    possible = false;
+                }
+            }
+            if possible {
+                doable.push(*step);
+            }
+        }
+
+        // pick the first available step alphabetically
+        doable.sort_unstable();
+
+        let step: char = doable.remove(0);
+        done.push(step);
+    }
+    done
+}
+
+fn seven_b(data: &HashMap<char, Vec<char>>) -> String {
+    let mut done = String::new();
+    let steps = data.keys().len();
+
+    let mut started = Vec::new();
+    let mut completion_schedule: HashMap<u32, Vec<char>> = HashMap::new();
+    let mut second = 0u32;
+    let mut workers_free = 5;
+
+    while done.len() != steps {
+        second += 1;
+        // Mark things done if they have finished by now.
+        for step in completion_schedule.get(&second).unwrap_or(&Vec::new()) {
+            done.push(*step);
+            workers_free += 1;
+        }
+
+        // Find things available to work on.
+        let mut doable = Vec::new();
+        for (step, reqs) in data {
+            if done.contains(*step) || started.contains(step) {
+                continue;
+            }
+
+            let mut possible = true;
+            for req in reqs {
+                if !done.contains(*req) {
+                    possible = false;
+                }
+            }
+            if possible {
+                doable.push(*step);
+            }
+        }
+
+        // Pick the first available step, alphabetically.
+        doable.sort_unstable();
+
+        // Get to work.
+        while workers_free > 0 && doable.len() > 0 {
+            let step: char = doable.remove(0);
+            let duration = (step as u32) - ('A' as u32) + 1 + 60;
+            completion_schedule.entry(duration + second).or_insert(Vec::new()).push(step);
+            started.push(step);
+        }
+    }
+
+    // All steps actually finished one second ago.
+    format!("{}", second - 1)
+}
+
+fn parse_nodes_a(data: &Vec<i32>, init_idx: usize) -> (i32, usize) {
+    // Returns metadata sum, number of values consumed.
+    let num_children = data[init_idx];
+    let num_metadata = data[init_idx + 1] as usize;
+
+    let mut sum = 0;
+    let mut idx = init_idx + 2;
+
+    for _ in 0 .. num_children {
+        let (child_value, new_idx) = parse_nodes_a(data, idx);
+        idx = new_idx;
+        sum += child_value
+    }
+
+    for val in &data[idx .. idx + num_metadata] {
+        sum += val;
+    }
+
+    idx += num_metadata;
+    return (sum, idx);
+}
+
+fn eight_a(data: &Vec<i32>) -> i32 {
+    let (sum, idx) = parse_nodes_a(data, 0);
+
+    assert!(idx == data.len());
+
+    sum
+}
+
+fn parse_nodes_b(data: &Vec<i32>, init_idx: usize) -> (i32, usize) {
+    // Returns node value, number of values consumed.
+    let num_children = data[init_idx];
+    let num_metadata = data[init_idx + 1] as usize;
+
+    let mut total = 0;
+    let mut idx = init_idx + 2;
+
+    let mut children = Vec::new();
+
+    if num_children == 0 {
+        // The value of a node without children is the sum of its metadata
+        for val in &data[idx .. idx + num_metadata] {
+            total += val;
+        }
+    } else {
+        // Otherwise it is the sum of the values of the children nodes indicated by the metadata.
+
+        // Parse children.
+        for _ in 0 .. num_children {
+            let (child_value, new_idx) = parse_nodes_b(data, idx);
+            idx = new_idx;
+            children.push(child_value);
+        }
+
+        // Sum values.
+        for &meta_val in &data[idx .. idx + num_metadata] {
+            if meta_val == 0 || (meta_val as usize) > children.len() {
+                continue;
+            } else {
+                total += children[(meta_val as usize)-1];
+            }
+        }
+    }
+
+    idx += num_metadata;
+    return (total, idx);
+}
+
+fn eight_b(data: &Vec<i32>) -> i32 {
+    let (sum, idx) = parse_nodes_b(data, 0);
+
+    assert!(idx == data.len());
+
+    sum
 }
 
 struct Puzzle<T, R> {
     // T is the type that the input gets parsed into
     // R is the type that the answer comes in
     name: &'static str,
-    preprocess: fn(Vec<String>) -> T,
     parts: Vec<fn(&T) -> R>,
+    delimiter: char,
+    preprocess: fn(Vec<String>) -> T,
 }
 
 fn solve_puzzle<T, R>(p: Puzzle<T, R>) where R: std::fmt::Display {
@@ -386,7 +542,7 @@ fn solve_puzzle<T, R>(p: Puzzle<T, R>) where R: std::fmt::Display {
     let filename = if debug { "test.txt".to_string() } else { format!("{}/{}.txt", dir, p.name) };
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
     let lines = contents.trim_end()
-        .split('\n')
+        .split(p.delimiter)
         .map(|x| x.to_string())
         .collect();
 
@@ -402,6 +558,7 @@ fn main() {
     let one = Puzzle {
         name: "one",
         parts: vec![one_a, one_b],
+        delimiter: '\n',
         preprocess: |v: Vec<String>|
             v.iter()
             .map(|x: &String| { (*x).parse::<i32>().unwrap_or(0) })
@@ -411,12 +568,14 @@ fn main() {
     let two = Puzzle {
         name: "two",
         parts: vec![two_a, two_b],
+        delimiter: '\n',
         preprocess: |x| x
     };
 
     let three = Puzzle {
         name: "three",
         parts: vec![three_a, three_b],
+        delimiter: '\n',
         preprocess: |v: Vec<String>|
             v.iter()
             .map(|x: &String| {
@@ -435,6 +594,7 @@ fn main() {
     let four = Puzzle {
         name: "four",
         parts: vec![four_a, four_b],
+        delimiter: '\n',
         preprocess: |mut v: Vec<String>| {
             v.sort_unstable();
             let re = Regex::new(r"\[(.*)-(.*)-(.*) (.*):(.*)\] (.*)").unwrap();
@@ -474,12 +634,14 @@ fn main() {
     let five = Puzzle {
         name: "five",
         parts: vec![five_a, five_b],
+        delimiter: '\n',
         preprocess: |mut x: Vec<String>| x.pop().unwrap(),
     };
 
     let six = Puzzle {
         name: "six",
         parts: vec![six_a, six_b],
+        delimiter: '\n',
         preprocess: |v: Vec<String>| {
             v.iter().map(|x| {
                 let vals: Vec<&str> = x.split(',').collect();
@@ -489,5 +651,33 @@ fn main() {
             }).collect()
         }
     };
-    solve_puzzle(six);
+
+    let seven = Puzzle {
+        name: "seven",
+        parts: vec![seven_a, seven_b],
+        delimiter: '\n',
+        preprocess: |v: Vec<String>| {
+            let mut dag = HashMap::new();
+
+            for line in v {
+                let bytes = line.into_bytes();
+                let req = char::from(bytes[5]);
+                let step = char::from(bytes[36]);
+
+                dag.entry(step).or_insert(Vec::new()).push(req);
+                dag.entry(req).or_insert(Vec::new());
+            }
+
+            dag
+        }
+    };
+
+    let eight = Puzzle {
+        name: "eight",
+        parts: vec![eight_a, eight_b],
+        delimiter: ' ',
+        preprocess: |v: Vec<String>| {
+            v.iter().map(|x| x.parse::<i32>().unwrap()).collect()
+        }
+    };
 }
