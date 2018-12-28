@@ -5,28 +5,26 @@ use std::fs;
 use std::collections::{HashSet, HashMap};
 use regex::Regex;
 
-fn one_a(data: &Vec<i32>) -> i32 {
+fn one_a(data: &Vec<i32>) -> String {
     let mut total = 0;
 
     for item in data {
         total += item;
-        println!("> {}", total);
     }
 
-    return total;
+    return format!("{}", total);
 }
 
-fn one_b(data: &Vec<i32>) -> i32 {
+fn one_b(data: &Vec<i32>) -> String {
     let mut map = HashSet::new();
     let mut total = 0;
 
     loop {
         for item in data {
             total += item;
-            println!("> {}", total);
 
             if map.contains(&total) {
-                return total;
+                return format!("{}", total);
             }
 
             map.insert(total);
@@ -34,19 +32,7 @@ fn one_b(data: &Vec<i32>) -> i32 {
     }
 }
 
-fn one() {
-    let filename = "inputs/one.txt";
-    let contents = fs::read_to_string(filename) .expect("Something went wrong reading the file");
-
-    let lines = contents.trim_end().split('\n');
-
-    let values: Vec<i32> = lines.map(|x| x.parse::<i32>().unwrap_or(0)).collect();
-
-    println!("{}", one_a(&values));
-    println!("{}", one_b(&values));
-}
-
-fn two_a<'a>(data: &Vec<&'a str>) -> i32 {
+fn two_a(data: &Vec<String>) -> String {
     let mut has_two = 0;
     let mut has_three = 0;
 
@@ -68,11 +54,10 @@ fn two_a<'a>(data: &Vec<&'a str>) -> i32 {
         has_three += id_three;
     }
 
-    println!("{}, {}", has_two, has_three);
-    return has_two * has_three;
+    format!("{}", has_two * has_three)
 }
 
-fn two_b<'a>(data: &Vec<&'a str>) -> String {
+fn two_b(data: &Vec<String>) -> String {
     for id in data {
         for id2 in data {
             let mut diff = 0;
@@ -92,19 +77,7 @@ fn two_b<'a>(data: &Vec<&'a str>) -> String {
         }
     }
 
-    return String::new();
-}
-
-fn two() {
-    let filename = "inputs/two.txt";
-    let contents = fs::read_to_string(filename) .expect("Something went wrong reading the file");
-
-    let lines = contents.trim_end().split('\n');
-
-    let values: Vec<&str> = lines.collect();
-
-    println!("{}", two_a(&values));
-    println!("{}", two_b(&values));
+    String::new()
 }
 
 struct Claim {
@@ -115,7 +88,7 @@ struct Claim {
     height: i32,
 }
 
-fn three_a(data: &Vec<Claim>) -> i32 {
+fn three_a(data: &Vec<Claim>) -> String {
     let mut fabric = HashMap::new();
 
     for claim in data {
@@ -134,46 +107,96 @@ fn three_a(data: &Vec<Claim>) -> i32 {
         }
     }
 
-    return doubles;
+    format!("{}", doubles)
 }
 
 fn three_b(data: &Vec<Claim>) -> String {
     let mut fabric = HashMap::new();
-    let mut overlaps = HashMap::new();
+
+    let mut pristine_claims = HashSet::new();
 
     for claim in data {
+        pristine_claims.insert(claim.id);
+
         for i in claim.x .. claim.x+claim.width {
             for j in claim.y .. claim.y+claim.height {
-                *fabric.entry((i, j)).or_insert(Vec::new()).insert(claim.id);
+                let claims = fabric.entry((i, j)).or_insert(HashSet::new());
+                claims.insert(claim.id);
+
+                if claims.len() > 1 {
+                    for tainted_claim in claims.iter() {
+                        pristine_claims.remove(tainted_claim);
+                    }
+                }
             }
         }
     }
 
-    return String::new();
+    for claim in pristine_claims.iter() {
+        return format!("{}", claim);
+    }
+
+    "0".to_string()
 }
 
-fn three() {
-    let filename = "inputs/three.txt";
-    let contents = fs::read_to_string(filename) .expect("Something went wrong reading the file");
+struct Puzzle<T> {
+    // T is the type that the input gets parsed into
+    name: &'static str,
+    preprocess: fn(Vec<String>) -> Vec<T>,
+    parts: Vec<fn(&Vec<T>) -> String>,
+}
 
-    let lines = contents.trim_end().split('\n');
+fn solve_puzzle<T>(p: Puzzle<T>) {
+    let debug = false;
+    let dir = "inputs";
 
-    let re = Regex::new(r"#(\d*) @ (\d*),(\d*): (\d*)x(\d*)").unwrap();
+    let filename = if debug { "test.txt".to_string() } else { format!("{}/{}.txt", dir, p.name) };
+    let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
+    let lines = contents.trim_end()
+        .split('\n')
+        .map(|x| x.to_string())
+        .collect();
 
-    let data: Vec<Claim> = lines.map(|x| {
-        let caps = re.captures(x).unwrap();
-        Claim { id: caps[1].parse().unwrap(),
-                x: caps[2].parse().unwrap(),
-                y: caps[3].parse().unwrap(),
-                width: caps[4].parse().unwrap(),
-                height: caps[5].parse().unwrap(),
-        }
-    }).collect();
+    let data = (p.preprocess)(lines);
 
-    println!("{}", three_a(&data));
-    println!("{}", three_b(&data));
+    for f in p.parts {
+        println!("{}", f(&data));
+    }
 }
 
 fn main() {
-    three();
+    #![allow(unused_variables)]
+    let one = Puzzle {
+        name: "one",
+        parts: vec![one_a, one_b],
+        preprocess: |v: Vec<String>|
+            v.iter()
+            .map(|x: &String| { (*x).parse::<i32>().unwrap_or(0) })
+            .collect()
+    };
+
+    let two = Puzzle {
+        name: "two",
+        parts: vec![two_a, two_b],
+        preprocess: |x| x
+    };
+
+    let three = Puzzle {
+        name: "three",
+        parts: vec![three_a, three_b],
+        preprocess: |v: Vec<String>|
+            v.iter()
+            .map(|x: &String| {
+                let re = Regex::new(r"#(\d*) @ (\d*),(\d*): (\d*)x(\d*)").unwrap();
+                let caps = re.captures(&x).unwrap();
+                Claim { id: caps[1].parse().unwrap(),
+                        x: caps[2].parse().unwrap(),
+                        y: caps[3].parse().unwrap(),
+                        width: caps[4].parse().unwrap(),
+                        height: caps[5].parse().unwrap(),
+                }
+            })
+            .collect()
+    };
+    solve_puzzle(three);
 }
