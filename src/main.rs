@@ -288,6 +288,86 @@ fn five_b(data: &String) -> String {
     format!("{}", shortest)
 }
 
+fn six_a(data: &Vec<(i32, i32)>) -> String {
+    // coordinates at the outside edge of the grid have infinite space and don't count
+    let (mut x_min, mut x_max, mut y_min, mut y_max) = (data[0].0, 0, data[0].1, 0);
+
+    for (x, y) in data {
+        x_min = std::cmp::min(*x, x_min);
+        x_max = std::cmp::max(*x, x_max);
+        y_min = std::cmp::min(*y, y_min);
+        y_max = std::cmp::max(*y, y_max);
+    }
+
+    let mut area_counter: HashMap<usize, u32> = HashMap::new();
+
+    for y in y_min .. y_max+1 {
+        for x in x_min .. x_max+1 {
+            let mut closest = 0usize;
+            let mut min_distance = x_max + y_max;
+            let mut tie = false;
+
+            for i in 0 .. data.len() {
+                let (cx, cy) = data[i];
+                let distance = (cx - x).abs() + (cy - y).abs();
+                if distance < min_distance {
+                    closest = i as usize;
+                    min_distance = distance;
+                    tie = false;
+                } else if distance == min_distance {
+                    tie = true;
+                }
+            }
+
+            if !tie {
+                *area_counter.entry(closest).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let mut max_count = 0;
+    for (idx, count) in area_counter {
+        let (x, y) = data[idx];
+        if !(x == x_min || x == x_max || y == y_min || y == y_max) {
+            max_count = std::cmp::max(count, max_count);
+        }
+    }
+    format!("{}", max_count)
+}
+
+fn six_b(data: &Vec<(i32, i32)>) -> String {
+    let (mut x_min, mut x_max, mut y_min, mut y_max) = (data[0].0, 0, data[0].1, 0);
+
+    for (x, y) in data {
+        x_min = std::cmp::min(*x, x_min);
+        x_max = std::cmp::max(*x, x_max);
+        y_min = std::cmp::min(*y, y_min);
+        y_max = std::cmp::max(*y, y_max);
+    }
+
+    let allowed_distance = 10_000;
+    let mut in_distance = 0;
+
+    for y in y_min .. y_max+1 {
+        for x in x_min .. x_max+1 {
+
+            let mut total_distance = 0;
+
+            for i in 0 .. data.len() {
+                let (cx, cy) = data[i];
+                let distance = (cx - x).abs() + (cy - y).abs();
+
+                total_distance += distance;
+            }
+            if total_distance < allowed_distance {
+                in_distance += 1;
+            }
+        }
+    }
+
+    format!("{}", in_distance)
+}
+
 struct Puzzle<T> {
     // T is the type that the input gets parsed into
     name: &'static str,
@@ -392,5 +472,18 @@ fn main() {
         parts: vec![five_a, five_b],
         preprocess: |mut x: Vec<String>| x.pop().unwrap(),
     };
-    solve_puzzle(five);
+
+    let six = Puzzle {
+        name: "six",
+        parts: vec![six_a, six_b],
+        preprocess: |v: Vec<String>| {
+            v.iter().map(|x| {
+                let vals: Vec<&str> = x.split(',').collect();
+                let x = vals[0].parse().unwrap();
+                let y = vals[1].trim_start().parse().unwrap();
+                (x, y)
+            }).collect()
+        }
+    };
+    solve_puzzle(six);
 }
