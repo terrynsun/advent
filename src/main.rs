@@ -8,6 +8,8 @@ use std::collections::{HashSet, HashMap};
 use regex::Regex;
 use chrono::prelude::*;
 
+mod helpers;
+
 fn one_a(data: &Vec<i32>) -> i32 {
     let mut total = 0;
 
@@ -526,6 +528,219 @@ fn eight_b(data: &Vec<i32>) -> i32 {
     sum
 }
 
+fn nine_a(data: &(u32, u32)) -> u32 {
+    let players = data.0;
+    let marbles = data.1;
+
+    let mut scores: HashMap<u32, u32> = HashMap::new();
+
+    let mut current_player = 0;
+    let mut idx = 1;
+
+    // The circle starts with one marble.
+    // Clockwise goes to the right.
+    let mut circle = vec![0, 2, 1];
+
+    for m in 3 .. marbles {
+        if m % 100000 == 0 {
+            println!("{}\t{}%", m, m as f32/marbles as f32);
+        }
+        current_player = (current_player + 1) % players;
+        if m % 23 == 0 {
+            idx = (idx + circle.len() - 7) % circle.len();
+            let removed = circle.remove(idx);
+
+            *scores.entry(current_player).or_insert(0) += (m + removed) as u32;
+        } else {
+            idx = (idx + 2) % circle.len();
+            if idx > circle.len() {
+                idx %= circle.len();
+            }
+            circle.insert(idx, m);
+        }
+    }
+
+    let mut scores_sorted = scores.values().collect::<Vec<&u32>>();
+    scores_sorted.sort_unstable();
+    *scores_sorted.pop().unwrap()
+}
+
+fn nine_b(data: &(u32, u32)) -> u32 {
+    // You're supposed to do this with linked lists, but I just let it run for... about an hour.
+    nine_a(&(data.0, data.1*100))
+}
+
+// position (x, y); velocity (x, y)
+// position: x: left = negative
+// position: y: up = negative; down = positive
+fn ten_a(data: &Vec<(i32, i32, i32, i32)>) -> String {
+    let mut positions: Vec<(i32, i32)> = data.into_iter().map( |(x, y, _, _)| (*x, *y)).collect();
+    let velocities: Vec<(i32, i32)> = data.into_iter().map( |(_, _, dx, dy)| (*dx, *dy)).collect();
+
+    fn draw(positions: &Vec<(i32, i32)>) -> Option<String> {
+        // create board
+        let (xmin, xmax, ymin, ymax) = helpers::minmax(positions);
+        let ylen = (ymax - ymin + 1) as usize;
+        let xlen = (xmax - xmin + 1) as usize;
+
+        // don't waste time rendering boards that are too big
+        if ylen > 100 || xlen > 100 {
+            return None;
+        }
+
+        let mut board = Vec::with_capacity(ylen);
+        for _ in 0 .. ylen {
+            let mut v = Vec::with_capacity(xlen);
+            for _ in 0 .. xlen {
+                v.push('.');
+            }
+            board.push(v);
+        }
+
+        // place coordinates
+        for (x, y) in positions {
+            //println!("x: {}; min-max: ({}, {}), len: {}", x, xmin, xmax, board[0].len());
+            //println!("y: {}; min-max: ({}, {}), len: {}", y, ymin, ymax, board[0].len());
+            board[(y - ymin) as usize][(x - xmin) as usize] = '#';
+        }
+
+        let lines: Vec<String> = board.into_iter().map(|line| line.into_iter().collect()).collect();
+        Some(lines.join("\n"))
+    }
+
+    // update
+    fn update(positions: &mut Vec<(i32, i32)>, velocities: &Vec<(i32, i32)>, steps: i32) {
+        for i in 0 .. positions.len() {
+            let (x, y) = positions[i];
+            let (dx, dy) = velocities[i];
+            positions[i] = (x + (dx * steps), y + (dy * steps));
+        }
+    }
+
+    let seed = 10000;
+    update(&mut positions, &velocities, seed);
+
+    // max length of board that can be generated
+    let mut prev_ylen = 100 * 100;
+    let mut prev_board = String::new();
+
+    for i in 0 .. 20000 {
+        // should pass this into the other function but I don't really feel like it
+        let (_, _, ymin, ymax) = helpers::minmax(&positions);
+        let new_ylen = (ymax - ymin + 1) as usize;
+        if new_ylen > prev_ylen {
+            println!("?? {}", seed+i-1);
+            return prev_board;
+        } else {
+            println!("!! {}", i);
+            let board = draw(&positions);
+            if let Some(s) = board {
+                prev_board = s;
+            }
+            prev_ylen = new_ylen;
+        }
+
+        update(&mut positions, &velocities, 1);
+    }
+    println!("{}", 33333);
+    String::new()
+}
+
+fn eleven_compute_grid(serial: u32, size: usize) -> Vec<Vec<i32>> {
+    // get the power value of a single cell
+    fn calc(x: i32, y: i32, serial: i32) -> i32 {
+        let rack_id = x + 10;
+        let mut power = rack_id * y;
+        power = power + serial;
+        power = power * rack_id;
+
+        power = power / 100;
+        power = power % 10;
+        power = power - 5;
+        power
+    }
+
+    let mut grid = Vec::new();
+    for x in 0 .. size {
+        let mut row = Vec::new();
+        for y in 0 .. size {
+            row.push(calc(x as i32, y as i32, serial as i32))
+        }
+        grid.push(row);
+    }
+    grid
+}
+
+fn eleven_square_power_level(grid: &Vec<Vec<i32>>, x: usize, y: usize, size: usize) -> i32 {
+    let mut sum = 0;
+    for i in 0 .. size {
+        for k in 0 .. size {
+            sum += grid[(x + i) as usize][(y + k) as usize];
+        }
+    }
+    sum
+}
+
+fn eleven_a(serial: &u32) -> String {
+    let size = 300usize;
+    let grid = eleven_compute_grid(*serial, size);
+
+    let mut max_idx = (0, 0);
+    let mut max = 0;
+
+    let square_size = 3;
+
+    for x in 0 .. size-square_size {
+        for y in 0 .. size-square_size {
+            let sum = eleven_square_power_level(&grid, x, y, square_size);
+            if sum > max {
+                max = sum;
+                max_idx = (x, y);
+            }
+        }
+    }
+    format!("{:?}, max={}", max_idx, max)
+}
+
+fn eleven_square_outer_level(grid: &Vec<Vec<i32>>, x: usize, y: usize, size: usize) -> i32 {
+    // size is off by one as it's "inclusive"
+    // size = 0 means the value of that grid cell
+    let size = size - 1;
+
+    let mut sum = 0;
+    for i in 0 .. size {
+        sum += grid[(x + size) as usize][(y + i) as usize];
+        sum += grid[(x + i) as usize][(y + size) as usize];
+    }
+    sum += grid[(x + size) as usize][(y + size) as usize];
+    sum
+}
+
+fn eleven_b(serial: &u32) -> String {
+    let grid_size = 300usize;
+    let grid = eleven_compute_grid(*serial, grid_size);
+
+    let mut vals = vec![vec![0; grid_size]; grid_size];
+    let mut max_idx = (0, 0);
+    let mut max = 0;
+    let mut max_size = 0;
+
+    for square_size in 1 .. 300 {
+        for x in 0 .. grid_size-square_size {
+            for y in 0 .. grid_size-square_size {
+                let change = eleven_square_outer_level(&grid, x, y, square_size);
+                vals[x][y] += change;
+                if vals[x][y] > max {
+                    max = vals[x][y];
+                    max_idx = (x, y);
+                    max_size = square_size;
+                }
+            }
+        }
+    }
+    format!("{:?}, size={}, max={}", max_idx, max_size, max)
+}
+
 struct Puzzle<T, R> {
     // T is the type that the input gets parsed into
     // R is the type that the answer comes in
@@ -680,4 +895,47 @@ fn main() {
             v.iter().map(|x| x.parse::<i32>().unwrap()).collect()
         }
     };
+
+    let nine = Puzzle {
+        name: "nine",
+        parts: vec![nine_a, nine_b],
+        delimiter: '\n',
+        preprocess: |v: Vec<String>| {
+            let re = Regex::new(r"(\d*) players; last marble is worth (\d*) points").unwrap();
+
+            let caps = re.captures(&v[0]).unwrap();
+
+            (caps[1].parse().unwrap(), caps[2].parse::<u32>().unwrap())
+        }
+    };
+
+    let ten = Puzzle {
+        name: "ten",
+        parts: vec![ten_a],
+        delimiter: '\n',
+        preprocess: |v: Vec<String>| {
+            // position=< 9,  1> velocity=< 0,  2>
+            let re = Regex::new(r"position=<\s*(-?\d*),\s*(-?\d*)> velocity=<\s*(-?\d*),\s*(-?\d*)>").unwrap();
+
+            v.iter().map(|line| {
+                let caps = re.captures(line).unwrap();
+
+                (
+                    caps[1].parse().unwrap(),
+                    caps[2].parse().unwrap(),
+                    caps[3].parse().unwrap(),
+                    caps[4].parse().unwrap()
+                )
+            }).collect()
+        }
+    };
+
+    let eleven = Puzzle {
+        name: "eleven",
+        parts: vec![eleven_a, eleven_b],
+        delimiter: '\n',
+        preprocess: |v: Vec<String>| v[0].parse().unwrap_or(0)
+    };
+
+    solve_puzzle(eleven);
 }
