@@ -11,13 +11,7 @@ use chrono::prelude::*;
 mod helpers;
 
 fn one_a(data: &Vec<i32>) -> i32 {
-    let mut total = 0;
-
-    for item in data {
-        total += item;
-    }
-
-    total
+    data.iter().sum()
 }
 
 fn one_b(data: &Vec<i32>) -> i32 {
@@ -37,6 +31,7 @@ fn one_b(data: &Vec<i32>) -> i32 {
     }
 }
 
+// two_b must return String
 fn two_a(data: &Vec<String>) -> String {
     let mut has_two = 0;
     let mut has_three = 0;
@@ -49,10 +44,10 @@ fn two_a(data: &Vec<String>) -> String {
             *counts.entry(ch).or_insert(0) += 1;
         }
         for v in counts.values() {
-            if *v == 2 {
-                id_two = 1;
-            } else if *v == 3 {
-                id_three = 1;
+            match *v {
+                2 => id_two = 1,
+                3 => id_three = 1,
+                _ => (),
             }
         }
         has_two += id_two;
